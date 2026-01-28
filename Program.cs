@@ -2,6 +2,7 @@ using HoneyRaesAPI.Models;
 using HoneyRaesAPI.Models.DTOs;
 using Npgsql;
 using DotNetEnv;
+using Sprache;
 
 Env.Load();
 
@@ -250,6 +251,63 @@ app.MapGet("/employees/{id}", (int id) =>
         }
     }
     return employee == null ? Results.NotFound() : Results.Ok(employee);
+});
+
+app.MapPost("/employees", (Employee employee) =>
+{
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+
+    connection.Open();
+
+    using NpgsqlCommand command = connection.CreateCommand();
+
+    command.CommandText = @"
+        INSERT INTO Employee (Name, Specialty)
+        VALUES (@name, @specialty)
+        RETURNING Id
+    ";
+
+    command.Parameters.AddWithValue("@name", employee.Name);
+    command.Parameters.AddWithValue("@specialty", employee.Specialty);
+
+    employee.Id = (int)command.ExecuteScalar();
+    return employee;
+});
+
+app.MapPut("/employees/{id}", (int id, Employee employee) =>
+{
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+    connection.Open();
+    using NpgsqlCommand command = connection.CreateCommand();
+    command.CommandText = @"
+        UPDATE Employee
+        SET Name = @name,
+            Specialty = @specialty
+        WHERE Id = @id
+    ";
+
+    command.Parameters.AddWithValue("@name", employee.Name);
+    command.Parameters.AddWithValue("@specialty", employee.Specialty);
+    command.Parameters.AddWithValue("@id", id);
+
+    command.ExecuteNonQuery();
+    return Results.NoContent();
+});
+
+app.MapDelete("/employees/{id}", (int id) =>
+{
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+    connection.Open();
+    using NpgsqlCommand command = connection.CreateCommand();
+    command.CommandText = @"
+        DELETE FROM Employee
+        WHERE Id = @id
+    ";
+
+    command.Parameters.AddWithValue("@id", id);
+
+    int rowsAffected = command.ExecuteNonQuery();
+    return rowsAffected > 0 ? Results.NoContent() : Results.NotFound();
 });
 
 // app.MapGet("/customers", () =>
